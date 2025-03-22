@@ -350,30 +350,120 @@ class MarkdownToPDFConverter(QMainWindow):
             with open(md_file, 'r', encoding='utf-8') as file:
                 md_content = file.read()
             
-            # Convertir Markdown a HTML con extras
-            html_content = markdown2.markdown(
-                md_content,
-                extras=[
-                    'tables',
-                    'fenced-code-blocks',
-                    'header-ids',
-                    'tag-friendly',
-                    'break-on-newline'
-                ]
-            )
-            
             # Crear documento DOCX
             doc = docx.Document()
             
-            # Agregar título
-            title = doc.add_heading('Markdown a DOCX', 0)
+            # Extraer el nombre del archivo para usarlo como título
+            file_name = os.path.basename(md_file)
+            file_title = os.path.splitext(file_name)[0]
+            
+            # Agregar título basado en el nombre del archivo
+            title = doc.add_heading(file_title, 0)
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
-            # Agregar contenido
-            for line in html_content.split('\n'):
-                paragraph = doc.add_paragraph()
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                paragraph.add_run(line)
+            # Procesar el contenido Markdown línea por línea
+            current_list = None
+            list_level = 0
+            in_code_block = False
+            code_block_content = []
+            
+            # Dividir el contenido en líneas
+            lines = md_content.split('\n')
+            i = 0
+            
+            while i < len(lines):
+                try:
+                    line = lines[i].strip()
+                    
+                    # Detectar bloques de código
+                    if line.startswith('```'):
+                        in_code_block = not in_code_block
+                        if in_code_block:
+                            code_block_content = []
+                        else:
+                            # Agregar el bloque de código completo
+                            code_para = doc.add_paragraph()
+                            code_run = code_para.add_run('\n'.join(code_block_content))
+                            code_run.font.name = 'Courier New'
+                            code_run.font.size = Pt(9)
+                            
+                            # Agregar sombreado al párrafo
+                            code_para.paragraph_format.left_indent = Pt(20)
+                            code_para.paragraph_format.right_indent = Pt(20)
+                            code_para.paragraph_format.space_before = Pt(10)
+                            code_para.paragraph_format.space_after = Pt(10)
+                        i += 1
+                        continue
+                    
+                    # Si estamos dentro de un bloque de código, agregar la línea al contenido
+                    if in_code_block:
+                        code_block_content.append(line)
+                        i += 1
+                        continue
+                    
+                    # Encabezados (h1 a h6)
+                    if line.startswith('#'):
+                        level = 0
+                        for char in line:
+                            if char == '#':
+                                level += 1
+                            else:
+                                break
+                        
+                        if level >= 1 and level <= 6:
+                            heading_text = line[level:].strip()
+                            heading = doc.add_heading(heading_text, level)
+                            heading.paragraph_format.space_before = Pt(12)
+                            heading.paragraph_format.space_after = Pt(6)
+                    
+                    # Listas no ordenadas
+                    elif line.startswith('* ') or line.startswith('- '):
+                        item_text = line[2:].strip()
+                        doc.add_paragraph(item_text, style='List Bullet')
+                    
+                    # Listas ordenadas
+                    elif line and line[0].isdigit() and '. ' in line:
+                        dot_pos = line.find('. ')
+                        if dot_pos != -1:
+                            item_text = line[dot_pos+2:].strip()
+                            doc.add_paragraph(item_text, style='List Number')
+                        else:
+                            # Si no tiene el formato esperado, tratar como texto normal
+                            para = doc.add_paragraph(line)
+                    
+                    # Citas
+                    elif line.startswith('>'):
+                        quote_text = line[1:].strip()
+                        quote = doc.add_paragraph(quote_text)
+                        quote.paragraph_format.left_indent = Pt(24)
+                        quote.paragraph_format.right_indent = Pt(24)
+                        quote.paragraph_format.space_before = Pt(6)
+                        quote.paragraph_format.space_after = Pt(6)
+                        quote.style = 'Intense Quote'
+                    
+                    # Líneas horizontales
+                    elif line == '---' or line == '***' or line == '___':
+                        doc.add_paragraph().add_run().add_break(docx.enum.text.WD_BREAK.PAGE)
+                    
+                    # Párrafos normales (texto)
+                    elif line:
+                        # Procesar formato inline
+                        para = doc.add_paragraph()
+                        
+                        # Método simplificado para procesar el texto
+                        # Agregar el texto sin formato especial
+                        para.add_run(line)
+                    
+                    # Línea vacía
+                    else:
+                        doc.add_paragraph()
+                    
+                    i += 1
+                except Exception as e:
+                    # Si hay un error al procesar una línea, simplemente la agregamos como texto plano
+                    # y continuamos con la siguiente línea
+                    para = doc.add_paragraph(lines[i] if i < len(lines) else "")
+                    i += 1
             
             # Generar el nombre del archivo DOCX
             docx_file = os.path.splitext(md_file)[0] + '.docx'
