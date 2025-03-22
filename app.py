@@ -260,6 +260,24 @@ class MarkdownToPDFConverter(QMainWindow):
             # Generar el nombre del archivo PDF
             pdf_file = os.path.splitext(md_file)[0] + '.pdf'
             
+            # Verificar si el archivo PDF ya existe
+            if os.path.exists(pdf_file):
+                reply = QMessageBox.question(
+                    self,
+                    "Archivo existente",
+                    f"El archivo {os.path.basename(pdf_file)} ya existe.\n¿Desea sobrescribirlo?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                
+                if reply == QMessageBox.No:
+                    QMessageBox.information(
+                        self,
+                        "Operación cancelada",
+                        "La conversión ha sido cancelada."
+                    )
+                    return
+            
             # Configuración de wkhtmltopdf
             config = pdfkit.configuration(wkhtmltopdf=r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe')
             
