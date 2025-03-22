@@ -1,12 +1,15 @@
 import sys
 import os
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, 
-                            QWidget, QFileDialog, QLabel, QMessageBox)
+                            QWidget, QFileDialog, QLabel, QMessageBox, QHBoxLayout)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette, QColor
 import markdown2
 import tempfile
 import pdfkit
+import docx
+from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 class MarkdownToPDFConverter(QMainWindow):
     def __init__(self):
@@ -51,14 +54,28 @@ class MarkdownToPDFConverter(QMainWindow):
         layout.addWidget(title_label)
         
         # Etiqueta de instrucciones
-        instructions = QLabel('Selecciona un archivo Markdown (.md) para convertirlo a PDF')
+        instructions = QLabel('Selecciona un archivo Markdown (.md) para convertirlo a PDF o DOCX')
         instructions.setAlignment(Qt.AlignCenter)
         layout.addWidget(instructions)
         
-        # Botón para seleccionar archivo
-        self.select_button = QPushButton('Seleccionar archivo Markdown')
-        self.select_button.clicked.connect(self.select_file)
-        layout.addWidget(self.select_button)
+        # Contenedor para botones
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(10)
+        button_layout.setAlignment(Qt.AlignCenter)
+        
+        # Botón para seleccionar archivo y convertir a PDF
+        self.pdf_button = QPushButton('Convertir a PDF')
+        self.pdf_button.clicked.connect(lambda: self.select_file_and_convert('pdf'))
+        button_layout.addWidget(self.pdf_button)
+        
+        # Botón para seleccionar archivo y convertir a DOCX
+        self.docx_button = QPushButton('Convertir a DOCX')
+        self.docx_button.clicked.connect(lambda: self.select_file_and_convert('docx'))
+        button_layout.addWidget(self.docx_button)
+        
+        layout.addWidget(button_container)
         
         # Etiqueta para mostrar el archivo seleccionado
         self.file_label = QLabel('Ningún archivo seleccionado')
@@ -68,12 +85,18 @@ class MarkdownToPDFConverter(QMainWindow):
         # Agregar espacio
         layout.addStretch()
         
+        # Etiqueta de atribución
+        attribution_label = QLabel('Hecho por Alexander Muñoz Castro')
+        attribution_label.setAlignment(Qt.AlignCenter)
+        attribution_label.setStyleSheet('font-size: 12px; font-style: italic; color: #7f8c8d;')
+        layout.addWidget(attribution_label)
+
         # Configurar colores de fondo
         palette = self.palette()
         palette.setColor(QPalette.Window, QColor('#f5f6fa'))
         self.setPalette(palette)
 
-    def select_file(self):
+    def select_file_and_convert(self, file_type):
         file_name, _ = QFileDialog.getOpenFileName(
             self,
             "Seleccionar archivo Markdown",
@@ -83,7 +106,10 @@ class MarkdownToPDFConverter(QMainWindow):
         
         if file_name:
             self.file_label.setText(f'Archivo seleccionado: {os.path.basename(file_name)}')
-            self.convert_to_pdf(file_name)
+            if file_type == 'pdf':
+                self.convert_to_pdf(file_name)
+            elif file_type == 'docx':
+                self.convert_to_docx(file_name)
 
     def convert_to_pdf(self, md_file):
         try:
@@ -309,6 +335,83 @@ class MarkdownToPDFConverter(QMainWindow):
                 self,
                 "Éxito",
                 f"PDF generado exitosamente:\n{pdf_file}"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al convertir el archivo:\n{str(e)}"
+            )
+
+    def convert_to_docx(self, md_file):
+        try:
+            # Leer el contenido del archivo Markdown
+            with open(md_file, 'r', encoding='utf-8') as file:
+                md_content = file.read()
+            
+            # Convertir Markdown a HTML con extras
+            html_content = markdown2.markdown(
+                md_content,
+                extras=[
+                    'tables',
+                    'fenced-code-blocks',
+                    'header-ids',
+                    'tag-friendly',
+                    'break-on-newline'
+                ]
+            )
+            
+            # Crear documento DOCX
+            doc = docx.Document()
+            
+            # Agregar título
+            title = doc.add_heading('Markdown a DOCX', 0)
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Agregar contenido
+            for line in html_content.split('\n'):
+                paragraph = doc.add_paragraph()
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                paragraph.add_run(line)
+            
+            # Generar el nombre del archivo DOCX
+            docx_file = os.path.splitext(md_file)[0] + '.docx'
+            
+            # Verificar si el archivo DOCX ya existe
+            if os.path.exists(docx_file):
+                reply = QMessageBox.question(
+                    self,
+                    "Archivo existente",
+                    f"El archivo {os.path.basename(docx_file)} ya existe.\n¿Desea sobrescribirlo?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                
+                if reply == QMessageBox.No:
+                    QMessageBox.information(
+                        self,
+                        "Operación cancelada",
+                        "La conversión ha sido cancelada."
+                    )
+                    return
+            
+            # Agregar atribución al final del documento
+            doc.add_paragraph()  # Espacio en blanco
+            attribution = doc.add_paragraph()
+            attribution.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            attribution_run = attribution.add_run("Hecho por Alexander Muñoz Castro")
+            attribution_run.font.size = Pt(10)
+            attribution_run.font.italic = True
+            attribution_run.font.color.rgb = RGBColor(127, 140, 141)  # Color gris similar al de la UI
+            
+            # Guardar el archivo DOCX
+            doc.save(docx_file)
+            
+            QMessageBox.information(
+                self,
+                "Éxito",
+                f"DOCX generado exitosamente:\n{docx_file}"
             )
             
         except Exception as e:

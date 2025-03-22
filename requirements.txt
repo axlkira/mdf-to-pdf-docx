@@ -1,3 +1,4 @@
 markdown2==2.4.3
 pdfkit==1.0.0
 PySide6>=6.8.0
+python-docx==0.8.11
