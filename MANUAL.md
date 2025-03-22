@@ -23,9 +23,9 @@ La aplicación cuenta con una interfaz gráfica intuitiva que facilita el proces
 
 ### Hardware
 - Procesador: Intel Core i3 o equivalente (2 GHz o superior)
-- Memoria RAM: 4 GB mínimo (8 GB recomendado)
-- Espacio en disco: 200 MB de espacio libre
-- Resolución de pantalla: 1280 x 720 o superior
+- Memoria RAM: 2 GB mínimo (8 GB recomendado)
+- Espacio en disco: 5 MB de espacio libre
+
 
 ### Software
 - Sistema Operativo: Windows 10/11 (64 bits)
